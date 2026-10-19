@@ -215,6 +215,33 @@ namespace Lua {
 				CHECK(Contains(traceback, "middle'"));
 			}
 
+			SUBCASE("tail_call")
+			{
+				const char* script = "function inner() error('boom') end\n"
+									 "function tail() return inner() end\n"
+									 "function outer() tail() end\n";
+
+				lua_pushcfunction(L, TracebackHandler);
+				const int handler = lua_gettop(L);
+
+				REQUIRE(luaL_loadbuffer(L, script, strlen(script), "=test") == LUA_OK);
+				REQUIRE(lua_pcall(L, 0, 0, handler) == LUA_OK);
+
+				lua_getglobal(L, "outer");
+				REQUIRE(lua_pcall(L, 0, 1, handler) != LUA_OK);
+				const String traceback = lua_tostring(L, -1);
+				INFO(traceback);
+
+				// Each Lua version writes the frame lost to the tail call differently, but never as a function with
+				// a source location, and the frames below it are still listed.
+				CHECK_FALSE(Contains(traceback, "<(tail call)"));
+				CHECK(Contains(traceback, "test:3:"));
+#ifdef RMLUI_LUA_51_COMPAT
+				// Lua 5.1 writes it like a C function.
+				CHECK(Contains(traceback, "(tail call): ?"));
+#endif
+			}
+
 			SUBCASE("without_message")
 			{
 				luaL_traceback(L, L, nullptr, 0);
