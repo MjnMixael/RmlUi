@@ -1,0 +1,57 @@
+# Fork-only workflow: builds the unit tests with the Lua plugin against each supported Lua version.
+# Not intended for upstream.
+name: Lua compatibility
+
+on:
+  push:
+    branches:
+      - 'lua51-*'
+  workflow_dispatch:
+
+jobs:
+  lua:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Lua 5.1
+            package: liblua5.1-0-dev
+            cmake_options: -DRMLUI_LUA_BINDINGS_LIBRARY=lua -DLUA_INCLUDE_DIR=/usr/include/lua5.1 -DLUA_LIBRARY=/usr/lib/x86_64-linux-gnu/liblua5.1.so
+          - name: Lua 5.2
+            package: liblua5.2-dev
+            cmake_options: -DRMLUI_LUA_BINDINGS_LIBRARY=lua -DLUA_INCLUDE_DIR=/usr/include/lua5.2 -DLUA_LIBRARY=/usr/lib/x86_64-linux-gnu/liblua5.2.so
+          - name: Lua 5.3
+            package: liblua5.3-dev
+            cmake_options: -DRMLUI_LUA_BINDINGS_LIBRARY=lua -DLUA_INCLUDE_DIR=/usr/include/lua5.3 -DLUA_LIBRARY=/usr/lib/x86_64-linux-gnu/liblua5.3.so
+          - name: Lua 5.4
+            package: liblua5.4-dev
+            cmake_options: -DRMLUI_LUA_BINDINGS_LIBRARY=lua -DLUA_INCLUDE_DIR=/usr/include/lua5.4 -DLUA_LIBRARY=/usr/lib/x86_64-linux-gnu/liblua5.4.so
+          - name: LuaJIT
+            package: libluajit-5.1-dev
+            cmake_options: -DRMLUI_LUA_BINDINGS_LIBRARY=luajit
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Install Dependencies
+      run: |-
+        sudo apt-get update
+        sudo apt-get install cmake ninja-build libfreetype6-dev libglfw3-dev ${{ matrix.package }}
+
+    - name: Configure CMake
+      run: >-
+        cmake -B Build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DBUILD_SHARED_LIBS=OFF
+        -DRMLUI_BACKEND=GLFW_GL3 -DRMLUI_LUA_BINDINGS=ON -DRMLUI_WARNINGS_AS_ERRORS=ON
+        ${{ matrix.cmake_options }}
+
+    - name: Build
+      run: cmake --build Build --target rmlui_unit_tests
+
+    - name: Lua tests
+      run: ./Build/rmlui_unit_tests --test-case="lua.*"
+
+    - name: All unit tests
+      run: ./Build/rmlui_unit_tests
