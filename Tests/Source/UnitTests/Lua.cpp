@@ -209,10 +209,10 @@ namespace Lua {
 				CHECK(Contains(traceback, "test:1:"));
 				CHECK(Contains(traceback, "test:2:"));
 				CHECK(Contains(traceback, "test:3:"));
-				// Newer Lua versions may write global functions as '_G.inner', so only check the end of each name.
+				// Newer Lua versions may write global functions as '_G.inner', so only check the end of each name. The
+				// outermost function is called from C, so whether its name is known differs between Lua versions.
 				CHECK(Contains(traceback, "inner'"));
 				CHECK(Contains(traceback, "middle'"));
-				CHECK(Contains(traceback, "outer'"));
 			}
 
 			SUBCASE("without_message")
@@ -245,6 +245,9 @@ static const String lua_data_model_rml = R"(
 <head>
 	<title>Test</title>
 	<link type="text/rcss" href="/assets/rml.rcss"/>
+	<style>
+		body { font-family: LatoLatin; }
+	</style>
 </head>
 <body data-model="lua_test">
 	<p id="title">{{ title }}</p>
