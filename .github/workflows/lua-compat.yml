@@ -13,6 +13,11 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
 
+    # GCC 13 reports a false array-bounds warning in RmlUi core at -O3, so build with clang like the upstream test jobs.
+    env:
+      CC: clang
+      CXX: clang++
+
     strategy:
       fail-fast: false
       matrix:
