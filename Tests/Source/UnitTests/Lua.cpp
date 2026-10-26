@@ -342,3 +342,93 @@ TEST_CASE("lua.plugin")
 	TestsShell::ShutdownShell();
 	lua_close(L);
 }
+
+static const String lua_iteration_rml = R"(
+<rml>
+<head>
+	<title>Test</title>
+	<link type="text/rcss" href="/assets/rml.rcss"/>
+	<style>
+		body { font-family: LatoLatin; }
+	</style>
+</head>
+<body id="iteration_doc">
+	<div id="parent" class="c" title="t" style="width: 10px;"><p>a</p><p>b</p><p>c</p></div>
+	<select id="sel"><option value="1">One</option><option value="2">Two</option></select>
+</body>
+</rml>
+)";
+
+// Runs a loop that increments the global 'count' and returns the final count, or -1 if the script failed.
+static int CountIterations(lua_State* L, const char* loop)
+{
+	const String code = "local doc = rmlui.contexts['main'].documents['iteration_doc']\n"
+						"local parent = doc:GetElementById('parent')\n"
+						"local options = Element.As.ElementFormControlSelect(doc:GetElementById('sel')).options\n"
+						"count = 0\n" +
+		String(loop);
+	if (!Rml::Lua::Interpreter::DoString(code, "iteration"))
+		return -1;
+	lua_getglobal(L, "count");
+	const int count = (int)lua_tointeger(L, -1);
+	lua_pop(L, 1);
+	return count;
+}
+
+TEST_CASE("lua.iteration")
+{
+	TestsShell::ShutdownShell();
+
+	lua_State* L = luaL_newstate();
+	luaL_openlibs(L);
+	Rml::Lua::Initialise(L);
+
+	Context* context = TestsShell::GetContext();
+	REQUIRE(context);
+
+	ElementDocument* document = context->LoadDocumentFromMemory(lua_iteration_rml);
+	REQUIRE(document);
+	document->Show();
+	TestsShell::RenderLoop();
+
+	SUBCASE("ipairs_child_nodes")
+	{
+		CHECK(CountIterations(L, "for _, child in ipairs(parent.child_nodes) do count = count + 1 end") == 3);
+	}
+	SUBCASE("pairs_child_nodes")
+	{
+		CHECK(CountIterations(L, "for _, child in pairs(parent.child_nodes) do count = count + 1 end") == 3);
+	}
+	SUBCASE("ipairs_select_options")
+	{
+		CHECK(CountIterations(L, "for _, option in ipairs(options) do count = count + 1 end") == 2);
+	}
+	SUBCASE("pairs_select_options")
+	{
+		CHECK(CountIterations(L, "for _, option in pairs(options) do count = count + 1 end") == 2);
+	}
+	SUBCASE("ipairs_contexts")
+	{
+		CHECK(CountIterations(L, "for _, c in ipairs(rmlui.contexts) do count = count + 1 end") == 1);
+	}
+	SUBCASE("pairs_contexts")
+	{
+		CHECK(CountIterations(L, "for _, c in pairs(rmlui.contexts) do count = count + 1 end") == 1);
+	}
+	SUBCASE("pairs_documents")
+	{
+		CHECK(CountIterations(L, "for _, d in pairs(doc.context.documents) do count = count + 1 end") >= 1);
+	}
+	SUBCASE("pairs_attributes")
+	{
+		CHECK(CountIterations(L, "for name, value in pairs(parent.attributes) do count = count + 1 end") == 4);
+	}
+	SUBCASE("pairs_style")
+	{
+		CHECK(CountIterations(L, "for name, value in pairs(parent.style) do if name == 'width' then count = count + 1 end end") == 1);
+	}
+
+	document->Close();
+	TestsShell::ShutdownShell();
+	lua_close(L);
+}
