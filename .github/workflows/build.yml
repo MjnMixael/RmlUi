@@ -27,6 +27,12 @@ jobs:
           - cmake_options: -DRMLUI_BACKEND=SDL_GL2 -DCMAKE_CXX_FLAGS="-fno-exceptions -fno-rtti"
           - cmake_options: -DRMLUI_BACKEND=SFML_GL2 -DRMLUI_THIRDPARTY_CONTAINERS=OFF
           - cmake_options: -DRMLUI_BACKEND=GLFW_VK -DCMAKE_BUILD_TYPE=Debug -DRMLUI_VK_DEBUG=ON -DRMLUI_PRECOMPILED_HEADERS=OFF
+          # Lua 5.1, which uses the Lua plugin's compatibility fallbacks.
+          - cmake_options: >-
+              -DRMLUI_BACKEND=GLFW_GL3 -DBUILD_TESTING=ON
+              -DLUA_INCLUDE_DIR=/usr/include/lua5.1 -DLUA_LIBRARY=/usr/lib/x86_64-linux-gnu/liblua5.1.so
+            extra_packages: liblua5.1-0-dev
+            enable_testing: true
 
     steps:
     - uses: actions/checkout@v6
@@ -34,7 +40,7 @@ jobs:
     - name: Install Dependencies
       run: |-
         sudo apt-get update
-        sudo apt-get install cmake ninja-build libsdl2-dev libsdl2-image-dev libfreetype6-dev libharfbuzz-dev liblua5.2-dev libsfml-dev librlottie-dev libglfw3-dev
+        sudo apt-get install cmake ninja-build libsdl2-dev libsdl2-image-dev libfreetype6-dev libharfbuzz-dev liblua5.2-dev libsfml-dev librlottie-dev libglfw3-dev ${{ matrix.extra_packages }}
 
     - name: Configure CMake
       run: >-
