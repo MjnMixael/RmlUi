@@ -16,6 +16,117 @@ static bool Contains(const String& haystack, const char* needle)
 	return haystack.find(needle) != String::npos;
 }
 
+static const String lua_environment_rml = R"RML(
+<rml>
+<head>
+	<title>Test</title>
+	<link type="text/rcss" href="/assets/rml.rcss"/>
+	<style>
+		body { font-family: LatoLatin; }
+	</style>
+	<script>
+		name = '{name}'
+		function GetName() return name end
+
+		-- Track this script's environment in a weak table, to check that it's freed with the document.
+		local environment = getfenv and getfenv(1) or _ENV
+		_G.environments = _G.environments or setmetatable({}, { __mode = 'k' })
+		_G.environments[environment] = true
+	</script>
+	<script src="/../Tests/Data/UnitTests/lua_environment.lua"/>
+</head>
+<body>
+	<div id="button" onclick="_G.clicked = GetName() .. ':' .. string.upper(name) .. ':' .. GetFileName()"/>
+	<div id="no_globals" onclick="local x = 1"/>
+</body>
+</rml>
+)RML";
+
+// Returns the environment test document, with the script's 'name' set to the given value.
+static String EnvironmentRml(const char* name)
+{
+	String rml = lua_environment_rml;
+	const size_t position = rml.find("{name}");
+	rml.replace(position, 6, name);
+	return rml;
+}
+
+static String GetGlobalString(lua_State* L, const char* name)
+{
+	lua_getglobal(L, name);
+	const char* value = lua_tostring(L, -1);
+	const String result = value ? value : "nil";
+	lua_pop(L, 1);
+	return result;
+}
+
+static String CountEnvironments(lua_State* L)
+{
+	REQUIRE(Lua::Interpreter::DoString("collectgarbage() collectgarbage() "
+									   "environment_count = 0 "
+									   "for _ in pairs(environments) do environment_count = environment_count + 1 end",
+		"count"));
+	return GetGlobalString(L, "environment_count");
+}
+
+// Loads two documents that each set the global 'name' and read it back from an inline event handler, through functions
+// defined in an inline and an external script. Returns what each document's handler saw, the value of 'name' in the
+// shared global table, and the number of distinct script environments before and after the documents are closed.
+static String RunDocumentEnvironments(const Lua::Options& options)
+{
+	TestsShell::ShutdownShell();
+
+	lua_State* L = luaL_newstate();
+	luaL_openlibs(L);
+	Lua::Initialise(L, options);
+
+	Context* context = TestsShell::GetContext();
+	REQUIRE(context);
+
+	ElementDocument* one = context->LoadDocumentFromMemory(EnvironmentRml("one"));
+	ElementDocument* two = context->LoadDocumentFromMemory(EnvironmentRml("two"));
+	REQUIRE(one);
+	REQUIRE(two);
+	one->Show();
+	two->Show();
+	TestsShell::RenderLoop();
+
+	one->GetElementById("button")->Click();
+	const String clicked_one = GetGlobalString(L, "clicked");
+	two->GetElementById("button")->Click();
+	const String clicked_two = GetGlobalString(L, "clicked");
+	const String global_name = GetGlobalString(L, "name");
+
+	// A handler that uses no global names has no environment to set on Lua 5.2 and later.
+	one->GetElementById("no_globals")->Click();
+
+	const String environments_open = CountEnvironments(L);
+	one->Close();
+	two->Close();
+	TestsShell::RenderLoop();
+	const String environments_closed = CountEnvironments(L);
+
+	TestsShell::ShutdownShell();
+	lua_close(L);
+
+	return clicked_one + "," + clicked_two + "," + global_name + "," + environments_open + "," + environments_closed;
+}
+
+TEST_CASE("lua.options.document_environments")
+{
+	SUBCASE("disabled")
+	{
+		// All documents share the global table, so the second document overwrites the first one's 'name'.
+		CHECK(RunDocumentEnvironments(Lua::Options()) == "two:TWO:two+file,two:TWO:two+file,two,1,1");
+	}
+	SUBCASE("enabled")
+	{
+		Lua::Options options;
+		options.document_environments = true;
+		CHECK(RunDocumentEnvironments(options) == "one:ONE:one+file,two:TWO:two+file,nil,2,0");
+	}
+}
+
 static int error_handler_calls = 0;
 static String error_handler_message;
 static String error_handler_lines;

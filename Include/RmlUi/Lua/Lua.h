@@ -17,6 +17,13 @@ namespace Lua {
 		/// application's own 'print' in the Lua state.
 		bool replace_print = true;
 
+		/// Give each document its own table of global variables. The document's scripts and inline event handlers (such
+		/// as 'onclick') then read and write that table, and look up any name it doesn't have in the shared global table.
+		/// By default, all documents share the global table.
+		/// @note Each document then holds a reference into the Lua state until it is destroyed, so a Lua state provided
+		/// by the application must not be closed until after Rml::Shutdown().
+		bool document_environments = false;
+
 		/// A Lua message handler for errors in Lua code run by the plugin. For runtime errors, Lua calls it at the point of
 		/// the error with the error object as its argument, so it can inspect the call stack. For syntax errors, the plugin
 		/// calls it with the error message after the code fails to load. When set, the plugin doesn't log these errors

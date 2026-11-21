@@ -1,4 +1,5 @@
 #include "LuaEventListener.h"
+#include "LuaDocument.h"
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Lua/Interpreter.h>
 #include <RmlUi/Lua/LuaType.h>
@@ -43,6 +44,7 @@ LuaEventListener::LuaEventListener(const String& code, Element* element) : Event
 	else
 		owner_document = nullptr;
 	strFunc = function;
+	apply_environment = true;
 	lua_settop(L, top);
 }
 
@@ -100,6 +102,17 @@ void LuaEventListener::ProcessEvent(Event& event)
 	// push the arguments
 	lua_getglobal(L, "EVENTLISTENERFUNCTIONS");
 	lua_rawgeti(L, -1, luaFuncRef);
+
+	// The owner document may not be known when the listener is created, so the document's environment is applied here.
+	if (apply_environment)
+	{
+		if (LuaDocument* document = rmlui_dynamic_cast<LuaDocument*>(owner_document))
+		{
+			document->ApplyEnvironment(L, -1, false);
+			apply_environment = false;
+		}
+	}
+
 	LuaType<Event>::push(L, &event, false);
 	LuaType<Element>::push(L, attached, false);
 	LuaType<Document>::push(L, owner_document, false);

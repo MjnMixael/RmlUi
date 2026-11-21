@@ -36,6 +36,9 @@ private:
 	Element* attached = nullptr;
 	ElementDocument* owner_document = nullptr;
 	String strFunc; // for debugging purposes
+
+	// Whether the function was compiled from a string and still needs its document's environment.
+	bool apply_environment = false;
 };
 
 } // namespace Lua

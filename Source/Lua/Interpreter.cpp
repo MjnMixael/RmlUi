@@ -1,3 +1,4 @@
+#include "InterpreterInternal.h"
 #include "LuaDocumentElementInstancer.h"
 #include "LuaEventListenerInstancer.h"
 #include "LuaPlugin.h"
@@ -82,7 +83,11 @@ lua_State* Interpreter::GetLuaState()
 bool Interpreter::LoadFile(const String& file)
 {
 	lua_State* L = GetLuaState();
+	return LoadFileChunk(L, file) && LuaCall(L, 0, 0);
+}
 
+bool LoadFileChunk(lua_State* L, const String& file)
+{
 	// use the file interface to get the contents of the script
 	FileInterface* file_interface = GetFileInterface();
 	FileHandle handle = file_interface->Open(file);
@@ -107,7 +112,7 @@ bool Interpreter::LoadFile(const String& file)
 		ReportLoadError(L, status);
 		return false;
 	}
-	return LuaCall(L, 0, 0);
+	return true;
 }
 
 bool Interpreter::DoString(const String& code, const String& name)

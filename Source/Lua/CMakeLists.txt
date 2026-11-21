@@ -28,6 +28,7 @@ add_library(rmlui_lua
 	GlobalLuaFunctions.cpp
 	GlobalLuaFunctions.h
 	Interpreter.cpp
+	InterpreterInternal.h
 	Log.cpp
 	Log.h
 	Lua.cpp
